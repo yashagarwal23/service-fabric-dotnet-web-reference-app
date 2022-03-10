@@ -7,6 +7,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.ServiceFabric.Services.Communication.AspNetCore;
 using Microsoft.ServiceFabric.Services.Communication.Runtime;
 using Microsoft.ServiceFabric.Services.Runtime;
@@ -31,22 +33,25 @@ namespace Web.Service
             return new ServiceInstanceListener[]
             {
                 new ServiceInstanceListener(serviceContext =>
-                    new WebListenerCommunicationListener(serviceContext, "ServiceEndpoint", (url, listener) =>
+                    new HttpSysCommunicationListener(serviceContext, "ServiceEndpoint", (url, listener) =>
                     {
                         url += "/fabrikam";
 
-                        ServiceEventSource.Current.ServiceMessage(serviceContext, $"Starting WebListener on {url}");
+                        ServiceEventSource.Current.ServiceMessage(serviceContext, $"Starting HttpSys Listener on {url}");
 
-                        return new WebHostBuilder().UseWebListener()
-                                    .ConfigureServices(
+                        return Host.CreateDefaultBuilder()
+                                   .ConfigureWebHostDefaults(webBuilder =>
+                                   {
+                                       webBuilder.UseHttpSys()
+                                            .UseContentRoot(Directory.GetCurrentDirectory())
+                                            .UseStartup<Startup>()
+                                            .UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.None)
+                                            .UseUrls(url);
+                                   })
+                                   .ConfigureServices(
                                         services => services
                                             .AddSingleton<StatelessServiceContext>(serviceContext))
-                                    .UseContentRoot(Directory.GetCurrentDirectory())
-                                    .UseStartup<Startup>()
-                                    .UseApplicationInsights()
-                                    .UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.None)
-                                    .UseUrls(url)
-                                    .Build();
+                                   .Build();
                     }))
             };
         }
